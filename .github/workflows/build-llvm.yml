@@ -1,0 +1,67 @@
+name: LLVM MinGW (Linux)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    container:
+      image: mstorsjo/llvm-mingw:latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64]
+        include:
+          - vcpkg_host: x64-mingw-static
+            vcpkg_target: x64-mingw-static
+            cmake_toolchain: toolchain-llvm-mingw-x64.cmake
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell
+        run: |
+          curl -LO https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/powershell_7.5.4-1.deb_amd64.deb
+          dpkg -i powershell_7.5.4-1.deb_amd64.deb
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: /tmp/cache
+          key: vcpkg-${{ matrix.vcpkg_target }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Configure CMake
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,/tmp/cache,readwrite"
+        run: |
+          cmake -G Ninja -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=install \
+            -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_HOST_TRIPLET=${{ matrix.vcpkg_host }} \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_target }} \
+            -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$(pwd)/${{ matrix.cmake_toolchain }} \
+            -DCMAKE_SHARED_LINKER_FLAGS="-s -static -Wl,--exclude-all-symbols -Wl,--gc-sections"
+
+      - name: Build with CMake
+        run: cmake --build build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-llvm-${{ matrix.vcpkg_target }}
+          path: build/*.dll

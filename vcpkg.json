@@ -1,0 +1,8 @@
+{
+    "builtin-baseline": "37dcabc43809a960f41758e00e615cc6e26e8bbf",
+    "dependencies": [
+        { "name": "libpng", "version>=": "1.6.53#0" },
+        { "name": "spdlog", "version>=": "1.16.0#0" },
+        { "name": "safetyhook", "version>=": "0.6.9#1" }
+    ]
+}
